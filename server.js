@@ -194,5 +194,89 @@ app.get('/api/admin/feedback', async (req, res) => {
     }
 });
 
+app.post('/api/feedback', async (req, res) => {
+    // Destructure the data from the request body
+    const { userId, message, rating } = req.body;
+
+    // SAFETY CHECK: Prevent the "undefined" error
+    if (userId === undefined || message === undefined || rating === undefined) {
+        return res.status(400).json({ 
+            error: "Missing data. Ensure userId, message, and rating are sent." 
+        });
+    }
+
+    try {
+        const [result] = await db.execute(
+            "INSERT INTO feedback (user_id, message, rating) VALUES (?, ?, ?)",
+            [userId, message, rating] // These must not be undefined
+        );
+        res.status(201).json({ message: "Feedback sent!" });
+    } catch (err) {
+        console.error("SQL Error:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+// server.js on your Dell laptop
+// Ensure this is placed AFTER app.use(express.json())
+
+app.get('/api/map/live-view', async (req, res) => {
+    try {
+        // Querying the bus_status and bus_stops tables you recently created
+        const [buses] = await db.execute("SELECT * FROM bus_status WHERE status = 'active'");
+        const [stops] = await db.execute("SELECT * FROM bus_stops");
+        
+        // This MUST return an object with these two keys
+        res.status(200).json({
+            buses: buses,
+            stops: stops
+        });
+    } catch (err) {
+        console.error("Database Error:", err.message);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+// server.js
+
+// 1. Ensure the prefix matches your apiClient baseURL (usually /api)
+// 2. Ensure the ID parameter is named correctly
+app.get('/api/bus/live-status/:busId', async (req, res) => {
+    const { busId } = req.params;
+    try {
+        // Querying the bus_status table you created in MySQL Workbench
+        const [rows] = await db.execute(
+            "SELECT * FROM bus_status WHERE bus_id = ?", 
+            [busId]
+        );
+        
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "Bus not found" });
+        }
+
+        res.status(200).json(rows[0]);
+    } catch (err) {
+        console.error("Database Error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+// server.js
+
+// 1. Ensure you have the '/api' prefix if your frontend uses it
+// 2. Ensure the parameter name is exactly ':userId'
+app.get('/api/student/my-passes/:userId', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        // Querying the buspassrequest table identified in your workbench
+        const [rows] = await db.execute(
+            "SELECT * FROM buspassrequest WHERE user_id = ?", 
+            [userId]
+        );
+        
+        // Always return an array, even if empty, so the frontend doesn't crash
+        res.status(200).json(rows);
+    } catch (err) {
+        console.error("Database Error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
 // Launch the application
 startServer();
