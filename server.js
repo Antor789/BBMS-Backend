@@ -7,56 +7,57 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-let db;
+// Global DB pool object
+let pool;
 
 async function startServer() {
     try {
         const dbUrl = process.env.DATABASE_URL;
 
         if (!dbUrl) {
-            throw new Error("DATABASE_URL is missing from Railway Variables!");
+            throw new Error("DATABASE_URL is undefined. Check Railway Variables.");
         }
 
-        // We use a configuration object instead of a raw string to force specific settings
-        db = await mysql.createPool({
+        // Professional Pool Configuration
+        pool = mysql.createPool({
             uri: dbUrl,
             ssl: {
-                rejectUnauthorized: false // This bypasses the handshake certificate error
+                // This is the "professional fix" for cloud handshake errors
+                rejectUnauthorized: false 
             },
             waitForConnections: true,
             connectionLimit: 10,
-            queueLimit: 0
+            queueLimit: 0,
+            enableKeepAlive: true,
+            keepAliveInitialDelay: 0
         });
-        
-        // Test connection
-        const conn = await db.getConnection(); 
-        console.log("✅ Successfully connected to Railway MySQL Database!");
-        conn.release(); // Always release the connection back to the pool
+
+        // Verify the connection immediately
+        const connection = await pool.getConnection();
+        console.log("✅ [DB] Successfully connected to Railway MySQL!");
+        connection.release(); // Return the connection to the pool
 
         const PORT = process.env.PORT || 8080;
         app.listen(PORT, '0.0.0.0', () => {
-            console.log(`🚀 Server is LIVE on port ${PORT}`);
+            console.log(`🚀 [Server] Active and listening on port ${PORT}`);
         });
 
     } catch (err) {
-        console.error("❌ Critical Failure: Could not connect to DB:", err.message);
-        setTimeout(startServer, 5000); 
+        console.error("❌ [Critical Failure] DB Connection Error:", err.message);
+        // Exponential backoff or simple retry
+        console.log("🔄 Retrying connection in 5 seconds...");
+        setTimeout(startServer, 5000);
     }
 }
 
+// Start the sequence
 startServer();
-
-// Request Logger
-app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-    next();
-});
 
 // --- 1. AUTHENTICATION ---
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        const [results] = await db.execute(
+        const [results] = await pool.execute(
             "SELECT user_id, name, email, role FROM users WHERE email = ? AND password = ?", 
             [email, password]
         );
@@ -76,7 +77,7 @@ app.post('/api/bus-pass/request', async (req, res) => {
     try {
         const { user_id, route_name, schedule_id } = req.body;
         const sql = "INSERT INTO buspassrequest (user_id, route_name, schedule_id, status) VALUES (?, ?, ?, 'Pending')";
-        await db.execute(sql, [user_id, route_name, schedule_id || 1]);
+        await pool.execute(sql, [user_id, route_name, schedule_id || 1]);
         res.status(200).json({ message: "Application submitted!" });
     } catch (err) { 
         res.status(500).json({ error: "Database error." }); 
