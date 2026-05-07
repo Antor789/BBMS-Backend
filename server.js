@@ -11,20 +11,27 @@ let db;
 
 async function startServer() {
     try {
-        // IMPORTANT: Railway URLs must be used as a single string 
-        // We add ?sslmode=disabled to prevent handshake errors
         const dbUrl = process.env.DATABASE_URL;
 
         if (!dbUrl) {
-            throw new Error("DATABASE_URL is missing from environment variables!");
+            throw new Error("DATABASE_URL is missing from Railway Variables!");
         }
 
-        // Using createPool is more stable for cloud deployments than createConnection
-        db = await mysql.createPool(dbUrl + "?sslmode=disabled");
+        // We use a configuration object instead of a raw string to force specific settings
+        db = await mysql.createPool({
+            uri: dbUrl,
+            ssl: {
+                rejectUnauthorized: false // This bypasses the handshake certificate error
+            },
+            waitForConnections: true,
+            connectionLimit: 10,
+            queueLimit: 0
+        });
         
-        // Test the connection immediately
-        await db.getConnection(); 
+        // Test connection
+        const conn = await db.getConnection(); 
         console.log("✅ Successfully connected to Railway MySQL Database!");
+        conn.release(); // Always release the connection back to the pool
 
         const PORT = process.env.PORT || 8080;
         app.listen(PORT, '0.0.0.0', () => {
@@ -33,7 +40,6 @@ async function startServer() {
 
     } catch (err) {
         console.error("❌ Critical Failure: Could not connect to DB:", err.message);
-        // Don't exit immediately so you can see the logs in Railway
         setTimeout(startServer, 5000); 
     }
 }
