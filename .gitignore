@@ -1,0 +1,14 @@
+# General
+node_modules/
+.env
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/*.log
+
+# Build files (if you use TypeScript later)
+dist/
+build/
