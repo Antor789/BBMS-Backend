@@ -36,7 +36,12 @@ async function startServer() {
         process.exit(1); 
     }
 }
+// This MUST use process.env.PORT for Railway to work
+const PORT = process.env.PORT || 8080;
 
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server is running on port ${PORT}`);
+});
 // --- 1. AUTHENTICATION ---
 app.post('/api/login', async (req, res) => {
     try {
