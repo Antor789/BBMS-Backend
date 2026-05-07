@@ -14,14 +14,17 @@ async function startServer() {
     try {
         // Priority 1: Use Railway's DATABASE_URL if available
         // Priority 2: Use local credentials for development
-        const connectionConfig = process.env.DATABASE_URL || {
-            host: 'localhost',
-            user: 'root',
-            password: 'your_local_password', 
-            database: 'bbms_db'
-        };
+        // Updated connection logic in server.js
+const connectionConfig = process.env.DATABASE_URL 
+    ? `${process.env.DATABASE_URL}?sslmode=disabled` // Disables SSL for Railway
+    : {
+        host: 'localhost',
+        user: 'root',
+        password: 'Antor789', 
+        database: 'bbms_db'
+    };
 
-        db = await mysql.createConnection(connectionConfig);
+db = await mysql.createConnection(connectionConfig);
         console.log("✅ Successfully connected to MySQL Database!");
 
         // Unified Port Listening: Railway needs process.env.PORT
