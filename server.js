@@ -1,33 +1,31 @@
 require('dotenv').config();
 const express = require('express');
-const mysql = require('mysql2/promise'); // Using promise-based for async/await
+const mysql = require('mysql2/promise');
 const cors = require('cors');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- DATABASE CONNECTION ---
 let db;
 
 async function startServer() {
     try {
-        // Priority 1: Use Railway's DATABASE_URL if available
-        // Priority 2: Use local credentials for development
-        // Updated connection logic in server.js
-const connectionConfig = process.env.DATABASE_URL 
-    ? `${process.env.DATABASE_URL}?sslmode=disabled` // Disables SSL for Railway
-    : {
-        host: 'localhost',
-        user: 'root',
-        password: 'Antor789', 
-        database: 'bbms_db'
-    };
+        // IMPORTANT: Railway URLs must be used as a single string 
+        // We add ?sslmode=disabled to prevent handshake errors
+        const dbUrl = process.env.DATABASE_URL;
 
-db = await mysql.createConnection(connectionConfig);
-        console.log("✅ Successfully connected to MySQL Database!");
+        if (!dbUrl) {
+            throw new Error("DATABASE_URL is missing from environment variables!");
+        }
 
-        // Unified Port Listening: Railway needs process.env.PORT
+        // Using createPool is more stable for cloud deployments than createConnection
+        db = await mysql.createPool(dbUrl + "?sslmode=disabled");
+        
+        // Test the connection immediately
+        await db.getConnection(); 
+        console.log("✅ Successfully connected to Railway MySQL Database!");
+
         const PORT = process.env.PORT || 8080;
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server is LIVE on port ${PORT}`);
@@ -35,9 +33,12 @@ db = await mysql.createConnection(connectionConfig);
 
     } catch (err) {
         console.error("❌ Critical Failure: Could not connect to DB:", err.message);
-        process.exit(1); 
+        // Don't exit immediately so you can see the logs in Railway
+        setTimeout(startServer, 5000); 
     }
 }
+
+startServer();
 
 // Request Logger
 app.use((req, res, next) => {
